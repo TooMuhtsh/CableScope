@@ -57,7 +57,7 @@ USB ni les vitesses de lien (WebUSB ne le permet pas), d'où ce découpage.
 
 ## Utilisation
 
-Les fichiers sont dans les [versions publiées](https://github.com/TooMuhtsh/Treasure-cables/releases)
+Les fichiers sont dans les [versions publiées](https://github.com/TooMuhtsh/CableScope/releases)
 (Windows, Linux et l'APK de CableScope Probe). Ils ne sont pas encore signés.
 
 **Windows** : téléchargez `cablescope-windows-x64.exe` et double-cliquez dessus.
