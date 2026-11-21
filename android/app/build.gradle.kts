@@ -15,6 +15,18 @@ android {
         versionName = "0.1.1"
     }
 
+    // Clé de débogage commune (publique, sans valeur) : les APK de la CI et
+    // des postes de développement s'installent les uns par-dessus les autres.
+    // La clé de publication du Play Store reste hors du dépôt.
+    signingConfigs {
+        getByName("debug") {
+            storeFile = file("debug.keystore")
+            storePassword = "android"
+            keyAlias = "androiddebugkey"
+            keyPassword = "android"
+        }
+    }
+
     buildTypes {
         release {
             isMinifyEnabled = true
