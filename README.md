@@ -94,9 +94,13 @@ dans sa propre console.
 
 **Linux** : téléchargez `cablescope-linux-x64`, un seul fichier qui fonctionne sur
 toutes les distributions x86-64, sans droits administrateur. Rendez-le exécutable
-(`chmod +x cablescope-linux-x64`) puis lancez-le. L'interface s'ouvre dans Chrome,
-Chromium ou Edge en mode application, ou à défaut dans le navigateur par défaut.
-L'onglet Écrans et le diagnostic approfondi n'existent que sous Windows.
+(`chmod +x cablescope-linux-x64`) puis lancez-le, d'un double-clic ou depuis un
+terminal. L'interface s'ouvre en mode application dans un navigateur Chromium
+(Chrome, Chromium, Edge, Brave, Vivaldi, Helium), à défaut dans le navigateur par
+défaut. La variable `BROWSER` impose un autre navigateur. Son adresse est aussi
+écrite dans le terminal, au cas où le navigateur ne s'ouvrirait pas. Sans affichage
+(SSH), l'outil écrit le rapport texte. L'onglet Écrans et le diagnostic approfondi
+n'existent que sous Windows.
 
 Pour les scripts, les options restent disponibles (`--json`, `--input`, `--details`,
 `--deep`, `--tui`, `--gui`, `--no-window`, `--help`). Lancées depuis un

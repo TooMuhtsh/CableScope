@@ -91,16 +91,26 @@ pub fn run(config: Config) -> io::Result<()> {
     }
 
     let opened = config.open_window && open_window(&url);
-    if !opened {
+    // L'adresse est toujours donnée dans le terminal : si le navigateur ne
+    // s'ouvre pas, elle reste le seul moyen d'atteindre l'interface (jeton
+    // compris). Sous Windows, seulement s'il n'a rien ouvert : un double-clic
+    // n'a pas de console.
+    if !opened || cfg!(not(windows)) {
         crate::platform::attach_console();
-        println!("CableScope est disponible à l'adresse :\n  {url}");
-        println!("(Ctrl+C pour quitter)");
-        if config.open_window {
-            // Aucun navigateur n'a pu s'ouvrir : on donne l'adresse, sans
-            // bloquer le serveur.
-            let text = format!("Ouvrez cette adresse dans votre navigateur :\n{url}");
-            std::thread::spawn(move || crate::platform::message(&text));
+        if opened {
+            println!(
+                "CableScope s'est ouvert dans le navigateur. Sinon, ouvrez cette adresse :\n  {url}"
+            );
+        } else {
+            println!("CableScope est disponible à l'adresse :\n  {url}");
         }
+        println!("(Ctrl+C pour quitter)");
+    }
+    if !opened && config.open_window {
+        // Aucun navigateur n'a pu s'ouvrir : on donne l'adresse, sans
+        // bloquer le serveur.
+        let text = format!("Ouvrez cette adresse dans votre navigateur :\n{url}");
+        std::thread::spawn(move || crate::platform::message(&text));
     }
 
     let host_ok = [format!("127.0.0.1:{port}"), format!("localhost:{port}")];
@@ -579,8 +589,9 @@ fn random_token() -> String {
         .collect()
 }
 
-/// Ouvre l'interface dans une fenêtre d'application (Edge, sinon Chrome ou
-/// Chromium), à défaut dans le navigateur par défaut.
+/// Ouvre l'interface dans une fenêtre d'application (Edge, Chrome ou un autre
+/// navigateur Chromium), à défaut dans le navigateur par défaut. Ailleurs que
+/// sous Windows, la variable `BROWSER` choisit le navigateur.
 fn open_window(url: &str) -> bool {
     use std::process::Command;
     let app_flag = format!("--app={url}");
@@ -593,6 +604,20 @@ fn open_window(url: &str) -> bool {
         "--no-first-run",
         "--no-default-browser-check",
     ];
+
+    #[cfg(not(windows))]
+    if let Some(browser) = std::env::var("BROWSER").ok().and_then(|b| {
+        b.split(':')
+            .map(str::trim)
+            .find(|b| !b.is_empty())
+            .map(str::to_owned)
+    }) {
+        // Le navigateur choisi par l'utilisateur, tel quel (ses options
+        // de lancement ne sont pas connues).
+        if Command::new(&browser).arg(url).spawn().is_ok() {
+            return true;
+        }
+    }
 
     for browser in app_browsers() {
         if Command::new(&browser).args(args).spawn().is_ok() {
@@ -632,9 +657,16 @@ fn app_browsers() -> Vec<std::path::PathBuf> {
     {
         [
             "microsoft-edge",
+            "microsoft-edge-stable",
             "google-chrome",
+            "google-chrome-stable",
             "chromium",
             "chromium-browser",
+            "brave",
+            "brave-browser",
+            "vivaldi",
+            "vivaldi-stable",
+            "helium-browser",
         ]
         .iter()
         .filter_map(|name| {

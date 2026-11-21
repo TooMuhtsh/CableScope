@@ -38,13 +38,13 @@ pub fn collect_from(sys: &Path) -> Result<Report, Error> {
     names.sort_by_key(|a| natural_key(a));
 
     let mut devices: BTreeMap<String, Device> = BTreeMap::new();
-    let mut bos_missing = false;
+    let mut bos = BosSupport::default();
     for name in &names {
         let dir = usb_dir.join(name);
-        let device = read_device(&usb_dir, name, &dir, &mut bos_missing);
+        let device = read_device(&usb_dir, name, &dir, &mut bos);
         devices.insert(name.clone(), device);
     }
-    if bos_missing && !devices.is_empty() {
+    if !bos.seen && bos.expected_but_missing {
         report.notes.push(
             "Descripteurs BOS indisponibles (noyau antérieur à 6.6) : les capacités maximales des appareils sont déduites du bcdUSB, avec moins de certitude.".to_owned(),
         );
@@ -91,7 +91,17 @@ pub fn collect_from(sys: &Path) -> Result<Report, Error> {
     Ok(report)
 }
 
-fn read_device(usb_dir: &Path, name: &str, dir: &Path, bos_missing: &mut bool) -> Device {
+/// Le noyau expose-t-il les descripteurs BOS (Linux 6.6+) ? Un seul fichier
+/// `bos_descriptors` suffit à le prouver. Son absence ne compte que sur un
+/// appareil qui doit en avoir un (bcdUSB 2.01 ou plus) : un appareil USB 2.0
+/// ou un hub racine USB 2 n'en a jamais.
+#[derive(Default)]
+struct BosSupport {
+    seen: bool,
+    expected_but_missing: bool,
+}
+
+fn read_device(usb_dir: &Path, name: &str, dir: &Path, bos_support: &mut BosSupport) -> Device {
     let lanes = match (
         read_num::<u8>(&dir.join("rx_lanes")),
         read_num::<u8>(&dir.join("tx_lanes")),
@@ -116,9 +126,14 @@ fn read_device(usb_dir: &Path, name: &str, dir: &Path, bos_missing: &mut bool) -
         .flat_map(|b| b.alt_modes.clone())
         .collect();
     let max_speed = match bos {
-        Some(info) => info.and_then(|b| b.max_speed).map(Sourced::declared),
+        Some(info) => {
+            bos_support.seen = true;
+            info.and_then(|b| b.max_speed).map(Sourced::declared)
+        }
         None => {
-            *bos_missing = true;
+            if usb_version.is_some_and(|v| v.0 >= 0x0201) {
+                bos_support.expected_but_missing = true;
+            }
             // Sans BOS, un bcdUSB >= 3.0 indique au moins un appareil SuperSpeed.
             // Un appareil USB 3 branché en USB 2 annonce souvent 2.10 : on ne
             // peut alors rien conclure.
@@ -550,6 +565,41 @@ mod tests {
         assert_eq!(vdo.highest_speed, Some(typec::CableSpeed::Usb32Gen2));
         assert_eq!(vdo.max_current_ma, Some(5000));
         assert_eq!(vdo.max_power_w(), Some(100));
+    }
+
+    const BOS_NOTE: &str = "Descripteurs BOS indisponibles";
+
+    fn has_bos_note(report: &Report) -> bool {
+        report.notes.iter().any(|n| n.starts_with(BOS_NOTE))
+    }
+
+    #[test]
+    fn bos_note_only_when_the_kernel_lacks_it() {
+        // Un seul appareil avec BOS prouve que le noyau les expose : les hubs
+        // racine et appareils sans BOS ne déclenchent pas la note.
+        let fake = xhci_with_ssd_on_usb2_cable();
+        assert!(!has_bos_note(&collect_from(&fake.sys()).unwrap()));
+
+        // Que des appareils USB 2.0 : ils n'ont pas de BOS, rien à signaler.
+        let usb2_only = FakeSys::new();
+        let pci = "devices/pci0000:00/0000:00:14.0";
+        usb2_only.device(
+            &format!("{pci}/usb1"),
+            "usb1",
+            &[("bDeviceClass", "09"), ("version", " 2.00")],
+        );
+        usb2_only.device(&format!("{pci}/usb1/1-1"), "1-1", &[("version", " 2.00")]);
+        assert!(!has_bos_note(&collect_from(&usb2_only.sys()).unwrap()));
+
+        // Un appareil USB 3 sans aucun fichier BOS nulle part : noyau ancien.
+        let old_kernel = FakeSys::new();
+        old_kernel.device(
+            &format!("{pci}/usb2"),
+            "usb2",
+            &[("bDeviceClass", "09"), ("version", " 3.10")],
+        );
+        old_kernel.device(&format!("{pci}/usb2/2-1"), "2-1", &[("version", " 3.20")]);
+        assert!(has_bos_note(&collect_from(&old_kernel.sys()).unwrap()));
     }
 
     #[test]

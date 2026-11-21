@@ -119,11 +119,9 @@ fn main() -> ExitCode {
         };
     }
 
-    // Par défaut : interface graphique. Ailleurs que sous Windows, seulement
-    // depuis un terminal interactif (pas quand la sortie est redirigée).
+    // Par défaut : interface graphique.
     let text_request = args.json || args.details || (args.input.is_some() && !args.gui);
-    let interactive = std::io::stdin().is_terminal() && std::io::stdout().is_terminal();
-    if !text_request && (cfg!(windows) || args.gui || interactive) {
+    if !text_request && (cfg!(windows) || args.gui || wants_window()) {
         let fixed_report = match args.input.as_deref().map(read_report).transpose() {
             Ok(r) => r,
             Err(e) => {
@@ -166,6 +164,24 @@ fn main() -> ExitCode {
     ExitCode::SUCCESS
 }
 
+/// Ailleurs que sous Windows, l'interface graphique s'ouvre depuis un
+/// terminal interactif, ou au double-clic dans une session graphique (pas de
+/// terminal en entrée, mais un affichage). Une sortie redirigée depuis un
+/// terminal (`cablescope | less`, `> rapport.txt`) et une session sans
+/// affichage (SSH) gardent le rapport texte.
+fn wants_window() -> bool {
+    let stdin = std::io::stdin().is_terminal();
+    let stdout = std::io::stdout().is_terminal();
+    let display = ["DISPLAY", "WAYLAND_DISPLAY"]
+        .iter()
+        .any(|v| std::env::var_os(v).is_some_and(|d| !d.is_empty()));
+    window_wanted(stdin, stdout, display)
+}
+
+fn window_wanted(stdin_terminal: bool, stdout_terminal: bool, display: bool) -> bool {
+    (stdin_terminal && stdout_terminal) || (!stdin_terminal && display)
+}
+
 fn read_report(path: &str) -> Result<Report, String> {
     std::fs::read_to_string(path)
         .map_err(|e| e.to_string())
@@ -174,4 +190,21 @@ fn read_report(path: &str) -> Result<Report, String> {
 
 fn to_json(report: &Report) -> String {
     serde_json::to_string_pretty(report).expect("rapport sérialisable")
+}
+
+#[cfg(test)]
+mod tests {
+    use super::window_wanted;
+
+    #[test]
+    fn window_or_text_report() {
+        // Terminal interactif.
+        assert!(window_wanted(true, true, false));
+        // Double-clic dans une session graphique : ni terminal, mais un affichage.
+        assert!(window_wanted(false, false, true));
+        // Sortie redirigée depuis un terminal : rapport texte.
+        assert!(!window_wanted(true, false, true));
+        // Session sans affichage (SSH, service) sans terminal : rapport texte.
+        assert!(!window_wanted(false, false, false));
+    }
 }
