@@ -3,6 +3,13 @@ name: CI
 on:
   push:
   pull_request:
+  # Publication lancée à la main depuis l'onglet Actions : GitHub crée
+  # l'étiquette v<version> sur le commit compilé.
+  workflow_dispatch:
+    inputs:
+      version:
+        description: Version à publier (par exemple 0.1.0)
+        required: true
 
 env:
   CARGO_TERM_COLOR: always
@@ -116,10 +123,11 @@ jobs:
           name: cablescope-probe-apk
           path: android/app/build/outputs/apk/debug/app-debug.apk
 
-  # Une étiquette v… publie une version GitHub avec les trois builds, une fois
-  # tous les contrôles passés. Rien n'est signé pour l'instant.
+  # Une étiquette v… (ou un lancement manuel) publie une version GitHub avec
+  # les trois builds, une fois tous les contrôles passés. Rien n'est signé
+  # pour l'instant.
   release:
-    if: startsWith(github.ref, 'refs/tags/v')
+    if: startsWith(github.ref, 'refs/tags/v') || github.event_name == 'workflow_dispatch'
     needs: [test, web, windows-exe, linux, wasm, android]
     runs-on: ubuntu-latest
     permissions:
@@ -132,7 +140,7 @@ jobs:
       - name: Version GitHub
         env:
           GH_TOKEN: ${{ github.token }}
-          TAG: ${{ github.ref_name }}
+          TAG: ${{ github.event_name == 'workflow_dispatch' && format('v{0}', inputs.version) || github.ref_name }}
         run: |
           version="${TAG#v}"
           mkdir publication
@@ -140,5 +148,6 @@ jobs:
           cp artefacts/cablescope-linux-x64/cablescope publication/cablescope-linux-x64
           cp artefacts/cablescope-probe-apk/app-debug.apk "publication/cablescope-probe-$version.apk"
           gh release create "$TAG" publication/* \
+            --target "$GITHUB_SHA" \
             --title "CableScope $version" \
             --notes-file "docs/versions/$version.md"
