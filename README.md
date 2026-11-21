@@ -57,8 +57,12 @@ USB ni les vitesses de lien (WebUSB ne le permet pas), d'où ce découpage.
 
 ## Utilisation
 
-**Windows** : téléchargez `cablescope.exe` (artefact `cablescope-windows-x64`
-de la CI GitHub Actions) et double-cliquez dessus. L'interface s'ouvre dans une
+Les fichiers sont dans les [versions publiées](https://github.com/TooMuhtsh/Treasure-cables/releases)
+(Windows, Linux et l'APK de CableScope Probe). Ils ne sont pas encore signés.
+
+**Windows** : téléchargez `cablescope-windows-x64.exe` et double-cliquez dessus.
+SmartScreen avertit au premier lancement car le fichier n'est pas signé.
+Cliquez sur « Informations complémentaires », puis « Exécuter quand même ». L'interface s'ouvre dans une
 fenêtre (Edge en mode application, Material Design 3, thème clair ou sombre) :
 
 - **Tester un câble** : débranchez l'appareil, branchez-le avec le câble à
@@ -87,6 +91,12 @@ protégée par un jeton aléatoire ; l'outil s'arrête quand la fenêtre est fer
 Sous Windows, l'exécutable est une application fenêtrée : un double-clic
 n'ouvre aucune console. `--tui` ouvre à la place une interface plein écran
 dans sa propre console.
+
+**Linux** : téléchargez `cablescope-linux-x64`, un seul fichier qui fonctionne sur
+toutes les distributions x86-64, sans droits administrateur. Rendez-le exécutable
+(`chmod +x cablescope-linux-x64`) puis lancez-le. L'interface s'ouvre dans Chrome,
+Chromium ou Edge en mode application, ou à défaut dans le navigateur par défaut.
+L'onglet Écrans et le diagnostic approfondi n'existent que sous Windows.
 
 Pour les scripts, les options restent disponibles (`--json`, `--input`, `--details`,
 `--deep`, `--tui`, `--gui`, `--no-window`, `--help`). Lancées depuis un

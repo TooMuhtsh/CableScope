@@ -16,9 +16,10 @@ Ce qui est prévu pour les prochaines versions, par ordre de priorité.
 
 ### Versions publiées (GitHub Releases)
 
-- Une étiquette (`v0.2.0`…) produit l'exécutable Windows, l'APK signé et
-  l'AAB, joints à la version.
-- Clé de signature de l'application conservée dans les secrets du dépôt.
+- En place : une étiquette (`v0.1.0`…) publie l'exécutable Windows,
+  l'exécutable Linux et l'APK, une fois la CI passée. Rien n'est signé.
+- À faire : APK signé et AAB (clé de signature dans les secrets du dépôt),
+  exécutable Windows signé, version Linux ARM64.
 
 ### CableScope Probe sur le Play Store
 

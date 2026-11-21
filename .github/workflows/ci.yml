@@ -62,6 +62,31 @@ jobs:
           name: cablescope-windows-x64
           path: target/release/cablescope.exe
 
+  linux:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+          cache-dependency-path: web/package-lock.json
+      - name: Interface web (embarquée dans l'exécutable)
+        working-directory: web
+        run: |
+          npm ci
+          npm run build
+      - uses: dtolnay/rust-toolchain@stable
+        with:
+          targets: x86_64-unknown-linux-musl
+      # Lié statiquement (musl) : un seul fichier pour toutes les distributions.
+      - run: cargo build --release -p cablescope --target x86_64-unknown-linux-musl
+      - run: strip target/x86_64-unknown-linux-musl/release/cablescope
+      - uses: actions/upload-artifact@v4
+        with:
+          name: cablescope-linux-x64
+          path: target/x86_64-unknown-linux-musl/release/cablescope
+
   wasm:
     runs-on: ubuntu-latest
     steps:
@@ -90,3 +115,30 @@ jobs:
         with:
           name: cablescope-probe-apk
           path: android/app/build/outputs/apk/debug/app-debug.apk
+
+  # Une étiquette v… publie une version GitHub avec les trois builds, une fois
+  # tous les contrôles passés. Rien n'est signé pour l'instant.
+  release:
+    if: startsWith(github.ref, 'refs/tags/v')
+    needs: [test, web, windows-exe, linux, wasm, android]
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/download-artifact@v4
+        with:
+          path: artefacts
+      - name: Version GitHub
+        env:
+          GH_TOKEN: ${{ github.token }}
+          TAG: ${{ github.ref_name }}
+        run: |
+          version="${TAG#v}"
+          mkdir publication
+          cp artefacts/cablescope-windows-x64/cablescope.exe publication/cablescope-windows-x64.exe
+          cp artefacts/cablescope-linux-x64/cablescope publication/cablescope-linux-x64
+          cp artefacts/cablescope-probe-apk/app-debug.apk "publication/cablescope-probe-$version.apk"
+          gh release create "$TAG" publication/* \
+            --title "CableScope $version" \
+            --notes-file "docs/versions/$version.md"
